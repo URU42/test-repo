@@ -81,6 +81,7 @@ echo "Pushed image: ${IMAGE}:${TAG}"
         }
 
 
+
 stage('Update Frontend GitOps Tag') {
     steps {
         withCredentials([
@@ -92,33 +93,39 @@ stage('Update Frontend GitOps Tag') {
             sh '''#!/bin/sh
 set -eu
 
-# 실제 GitOps 저장소 주소로 변경
 GITOPS_REPO="https://github.com/URU42/being-gitops.git"
-
 IMAGE="harbor.uru42.space/uru42/frontend"
-
-# 기존 Build Frontend Stage가 저장한 태그
 TAG="$(cat "$WORKSPACE/.frontend-image-tag")"
 
-# 임시 GitOps 저장소
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
 
+echo "[1/6] Clone GitOps repository"
 git clone --branch main --depth 1 \
   "$GITOPS_REPO" "$WORKDIR/gitops"
 
 cd "$WORKDIR/gitops/k8s/overlays"
 
-# Frontend 이미지 태그만 변경
+echo "[2/6] Update frontend image tag"
+echo "Target: ${IMAGE}:${TAG}"
+
 kustomize edit set image "${IMAGE}=${IMAGE}:${TAG}"
 
-# 생성되는 Kubernetes 매니페스트 검증
+echo "[3/6] Render Kubernetes manifests"
 kustomize build . > "$WORKDIR/rendered.yaml"
 
-grep -F "image: ${IMAGE}:${TAG}" \
-  "$WORKDIR/rendered.yaml" > /dev/null
+echo "Images in rendered manifests:"
+grep -n 'image:' "$WORKDIR/rendered.yaml" || true
 
-# Git Commit
+echo "[4/6] Verify frontend image"
+
+if ! grep -Fq "image: ${IMAGE}:${TAG}" \
+    "$WORKDIR/rendered.yaml"; then
+    echo "ERROR: Frontend image tag not found in rendered manifests" >&2
+    exit 1
+fi
+
+echo "[5/6] Commit GitOps changes"
 cd "$WORKDIR/gitops"
 
 git config user.name "URU42 Jenkins"
@@ -126,18 +133,18 @@ git config user.email "jenkins@localhost"
 
 git add k8s/overlays/kustomization.yaml
 
-# 이미지 태그 변경이 없으면 종료
 if git diff --cached --quiet; then
     echo "No GitOps changes"
     exit 0
 fi
 
+git diff --cached --stat
 git commit -m "deploy(frontend): ${TAG}"
 
-# GitOps 저장소 업데이트
+echo "[6/6] Push GitOps changes"
 git push origin HEAD:main
 
-echo "GitOps updated: frontend:${TAG}"
+echo "SUCCESS: Frontend GitOps updated to ${TAG}"
 '''
         }
     }
