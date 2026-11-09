@@ -104,7 +104,7 @@ echo "[1/6] Clone GitOps repository"
 git clone --branch main --depth 1 \
   "$GITOPS_REPO" "$WORKDIR/gitops"
 
-cd "$WORKDIR/gitops/k8s/overlays"
+cd "$WORKDIR/gitops/k8s/test"
 
 echo "[2/6] Update frontend image tag"
 echo "Target: ${IMAGE}:${TAG}"
@@ -131,7 +131,7 @@ cd "$WORKDIR/gitops"
 git config user.name "URU42 Jenkins"
 git config user.email "jenkins@localhost"
 
-git add k8s/overlays/kustomization.yaml
+git add k8s/test/kustomization.yaml
 
 if git diff --cached --quiet; then
     echo "No GitOps changes"
