@@ -1,0 +1,83 @@
+
+pipeline {
+    agent { label 'rootless-docker' }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        skipDefaultCheckout(true)
+    }
+
+    environment {
+        IMAGE = 'harbor.uru42.space/uru42/frontend'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Validate Frontend') {
+            steps {
+                sh '''
+                    test -f frontend/Dockerfile
+                    test -d frontend
+                '''
+            }
+        }
+
+        stage('Build Frontend') {
+            steps {
+                sh '''#!/bin/sh
+set -eu
+
+export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+
+TAG="test-${BUILD_NUMBER}-$(git rev-parse --short=8 HEAD)"
+printf '%s' "$TAG" > .frontend-image-tag
+
+docker build \
+  -t "${IMAGE}:${TAG}" \
+  -f frontend/Dockerfile \
+  frontend
+
+echo "Built image: ${IMAGE}:${TAG}"
+'''
+            }
+        }
+
+        stage('Push Frontend') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'harbor-jenkins-robot',
+                        usernameVariable: 'HARBOR_USER',
+                        passwordVariable: 'HARBOR_PASS'
+                    )
+                ]) {
+                    sh '''#!/bin/sh
+set -eu
+set +x
+
+export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+export DOCKER_CONFIG="$(mktemp -d)"
+trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+
+TAG="$(cat .frontend-image-tag)"
+
+printf '%s' "$HARBOR_PASS" |
+  docker login harbor.uru42.space \
+    -u "$HARBOR_USER" \
+    --password-stdin
+
+docker push "${IMAGE}:${TAG}"
+
+echo "Pushed image: ${IMAGE}:${TAG}"
+'''
+                }
+            }
+        }
+    }
+}

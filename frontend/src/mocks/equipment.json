@@ -1,0 +1,41 @@
+{
+  "items": [
+    {
+      "id": "pump-001",
+      "name": "데모 순환 펌프 1호",
+      "type": "pump",
+      "location": "가상 플랜트 A",
+      "sensors": [
+        {
+          "key": "vibration",
+          "label": "진동",
+          "value": 4.2,
+          "unit": "mm/s",
+          "measured_at": "2026-10-27T00:00:00Z"
+        },
+        {
+          "key": "temperature",
+          "label": "온도",
+          "value": 68.0,
+          "unit": "°C",
+          "measured_at": "2026-10-27T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "compressor-002",
+      "name": "데모 압축기 2호",
+      "type": "compressor",
+      "location": "가상 플랜트 B",
+      "sensors": [
+        {
+          "key": "pressure",
+          "label": "압력",
+          "value": 6.0,
+          "unit": "bar",
+          "measured_at": "2026-10-27T00:00:00Z"
+        }
+      ]
+    }
+  ]
+}
