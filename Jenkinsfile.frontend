@@ -79,5 +79,69 @@ echo "Pushed image: ${IMAGE}:${TAG}"
                 }
             }
         }
+
+
+stage('Update Frontend GitOps Tag') {
+    steps {
+        withCredentials([
+            gitUsernamePassword(
+                credentialsId: 'gitops-github-pat',
+                gitToolName: 'Default'
+            )
+        ]) {
+            sh '''#!/bin/sh
+set -eu
+
+# 실제 GitOps 저장소 주소로 변경
+GITOPS_REPO="https://github.com/URU42/being-gitops.git"
+
+IMAGE="harbor.uru42.space/uru42/frontend"
+
+# 기존 Build Frontend Stage가 저장한 태그
+TAG="$(cat "$WORKSPACE/.frontend-image-tag")"
+
+# 임시 GitOps 저장소
+WORKDIR="$(mktemp -d)"
+trap 'rm -rf "$WORKDIR"' EXIT
+
+git clone --branch main --depth 1 \
+  "$GITOPS_REPO" "$WORKDIR/gitops"
+
+cd "$WORKDIR/gitops/k8s/overlays"
+
+# Frontend 이미지 태그만 변경
+kustomize edit set image "${IMAGE}=${IMAGE}:${TAG}"
+
+# 생성되는 Kubernetes 매니페스트 검증
+kustomize build . > "$WORKDIR/rendered.yaml"
+
+grep -F "image: ${IMAGE}:${TAG}" \
+  "$WORKDIR/rendered.yaml" > /dev/null
+
+# Git Commit
+cd "$WORKDIR/gitops"
+
+git config user.name "URU42 Jenkins"
+git config user.email "jenkins@localhost"
+
+git add k8s/overlays/kustomization.yaml
+
+# 이미지 태그 변경이 없으면 종료
+if git diff --cached --quiet; then
+    echo "No GitOps changes"
+    exit 0
+fi
+
+git commit -m "deploy(frontend): ${TAG}"
+
+# GitOps 저장소 업데이트
+git push origin HEAD:main
+
+echo "GitOps updated: frontend:${TAG}"
+'''
+        }
+    }
+}
+
     }
 }
