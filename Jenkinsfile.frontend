@@ -2,10 +2,6 @@
 pipeline {
     agent { label 'rootless-docker' }
 
-    triggers {
-        githubPush()
-    }
-
     options {
         timestamps()
         disableConcurrentBuilds()
